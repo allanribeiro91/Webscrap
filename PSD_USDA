@@ -1,0 +1,274 @@
+Option Explicit
+'''''''''''''''''''''''''''''''''''''''''''''''''
+'SELENIUM
+Dim navegador As New Selenium.ChromeDriver
+Dim findBy As New Selenium.By
+'''''''''''''''''''''''''''''''''''''''''''''''''
+'CONSTANTES
+Const const_origem As String = "C:\Users\allan.ribeiro\Downloads\"
+Const caminho = const_origem & "PSD-USDA"
+'''''''''''''''''''''''''''''''''''''''''''''''''
+'''''''''''''''''''''''''''''''''''''''''''''''''
+
+Sub main()
+
+    Call criar_pasta_download
+    Call selenium_main
+    Call copiar_dados_psd
+    Call atualizar_psd_dados_limpos
+    
+    Sheets("psd_dados_limpos").Range("M1").Value = Now
+    
+    ThisWorkbook.Save
+    
+    MsgBox "Atualização dos dados finalizada com sucesso!", vbInformation, "Operação realizada com sucesso"
+
+End Sub
+
+Sub selenium_main()
+    
+    'Selenium VBA
+    'https://github.com/florentbr/SeleniumBasic/releases/tag/v2.0.9.0
+    
+    'Chromedriver (C:UsersDiego AmorimAppDataLocalSeleniumBasic)
+    'https://chromedriver.chromium.org/home
+    
+    Dim url As String
+    
+    'Definindo a URL
+    url = "https://apps.fas.usda.gov/psdonline/app/index.html#/app/topCountriesByCommodity"
+    
+    With navegador
+        
+        'Definindo a pasta de download
+        .SetPreference "download.default_directory", caminho
+        .SetPreference "download.directory_upgrade", True
+        .SetPreference "download.prompt_for_download", False
+        
+        'Iniciando o navegador
+        .Start
+        
+        'Buscando a url
+        .Get url
+        
+        'Call
+        Call selenium_produtos
+    
+        'Fechar o navegador
+        .Quit
+        
+    End With
+    
+End Sub
+
+Sub selenium_produtos()
+
+    Dim produto As Integer
+
+    With navegador
+
+        'Loop
+        For produto = 0 To 12
+            'Selecionando o produto
+            .FindElementById("rb" & produto).Click
+            .FindElementByXPath("/html/body/div[2]/div[3]/div/div/div[2]/div[2]/div[1]/div/div[2]/button").Click
+            .Wait 2000
+            .FindElementById("r4").Click
+            .Wait 1000
+    
+            'Call
+            Call selenium_dropdown
+        Next
+    
+    End With
+
+End Sub
+
+Sub selenium_dropdown()
+
+    Dim selectElement As WebElement
+    Dim options As WebElements
+    Dim item As WebElement
+
+    ' Localizar a caixa de seleção e obter as opções
+    Set selectElement = navegador.FindElementByXPath("/html/body/div[2]/div[3]/div/div/div[2]/div[2]/div[1]/div/div[1]/select")
+    Set options = selectElement.FindElementsByTag("option")
+    
+    ' Loop para selecionar cada opção
+    For Each item In options
+        
+        ' Selecionar a opção
+        selectElement.AsSelect.SelectByText item.Text
+        navegador.FindElementByXPath("/html/body/div[2]/div[3]/div/div/div[2]/div[2]/div[1]/div/div[2]/button").Click
+        navegador.Wait 1000
+    
+        Call selenium_download
+    Next
+
+End Sub
+
+Sub selenium_download()
+    
+    On Error GoTo Erro
+
+    Dim tabelas As Selenium.WebElements
+    Dim tabela1 As String, tabela2 As String, tabela3 As String, tabela4 As String, tabela5 As String
+    Dim nTabelas As Integer
+    
+    'Descobrindo o numero de tabelas
+    Set tabelas = navegador.FindElementsByTag("table")
+    nTabelas = tabelas.Count
+    
+    With navegador
+
+        'Download das tabelas
+        tabela1 = "#table28 > table > thead > tr:nth-child(1) > td > a:nth-child(3) > i"
+        tabela2 = "#table57 > table > thead > tr:nth-child(1) > td > a:nth-child(3) > i"
+        tabela3 = "#table88 > table > thead > tr:nth-child(1) > td > a:nth-child(3) > i"
+        tabela4 = "#table125 > table > thead > tr:nth-child(1) > td > a:nth-child(3) > i"
+        tabela5 = "#table176 > table > thead > tr:nth-child(1) > td > a:nth-child(3) > i"
+        
+        'tabela 1
+        If 1 <= nTabelas Then
+            .FindElementByCss(tabela1).Click
+            .Wait 1000
+        End If
+
+        'tabela 2
+        If 2 <= nTabelas Then
+            .FindElementByCss(tabela2).Click
+            .Wait 1000
+        End If
+
+        'tabela 3
+        If 3 <= nTabelas Then
+            .FindElementByCss(tabela3).Click
+            .Wait 1000
+        End If
+
+        'tabela 4
+        If 4 <= nTabelas Then
+            .FindElementByCss(tabela4).Click
+            .Wait 1000
+        End If
+    
+        'tabela 5
+        If 5 <= nTabelas Then
+            .FindElementByCss(tabela5).Click
+            .Wait 1000
+        End If
+            
+    End With
+
+Erro:
+
+End Sub
+
+Function f_lista_arquivos() As Variant
+
+    Dim tabela As ListObject
+    Dim coluna As Range
+    Dim i As Integer
+    
+    ' Definir a tabela e a coluna a ser atribuída a lista
+    Set tabela = Planilha1.ListObjects(1)
+    Set coluna = tabela.ListColumns(1).DataBodyRange
+    
+    ' Atribuir a lista de valores a variável ListaValores
+    f_lista_arquivos = coluna.Value
+    
+End Function
+
+Sub criar_pasta_download()
+    
+    Call apagar_pasta_download
+    MkDir caminho
+
+End Sub
+
+Sub apagar_pasta_download()
+
+    Dim fso As FileSystemObject
+    Set fso = New FileSystemObject
+    
+    'Verificar se a pasta existe antes de tentar remover
+    If fso.FolderExists(caminho) Then
+        'Remover todos os arquivos e subpastas na pasta
+        fso.DeleteFolder caminho, True
+    End If
+    
+    Set fso = Nothing
+
+End Sub
+
+Sub copiar_dados_psd()
+        
+    'Definir o intervalo onde os dados serão colados na planilha matriz
+    Dim intervaloDestino As Range
+    Dim planilhaMatriz As Workbook
+    Dim ultima_linha As Integer, nLinhasCopiadas As Integer
+    ultima_linha = Planilha3.UsedRange.Rows.Count + 1
+    Set intervaloDestino = ThisWorkbook.Sheets("psd_dados_brutos").Cells(ultima_linha, 2)
+        
+    'Criar um objeto FileSystemObject
+    Dim fso As FileSystemObject
+    Set fso = New FileSystemObject
+    
+    'Obter uma coleção de nomes de arquivo na pasta de origem
+    Dim arquivos As Files
+    Set arquivos = fso.GetFolder(caminho).Files
+    
+    'Loop pelos arquivos na pasta de origem
+    Dim arquivo As File
+    For Each arquivo In arquivos
+        'Abrir a pasta de trabalho atual
+        Dim pastaDeTrabalho As Workbook
+        Set pastaDeTrabalho = Workbooks.Open(arquivo.Path)
+        
+        'Copiar os dados
+        Application.Workbooks(arquivo.Name).Activate
+        
+        If Range("A3").Value = "" Then
+            pastaDeTrabalho.Close False
+            GoTo proximo_arquivo
+        End If
+        
+        Range("A3").Select
+        Range(Selection, Selection.End(xlToRight)).Select
+        Range(Selection, Selection.End(xlDown)).Select
+        Selection.Copy
+        nLinhasCopiadas = Selection.Rows.Count - 1
+        
+        'Colar os dados
+        intervaloDestino.PasteSpecial xlPasteValues
+        With Planilha3
+            .Range(.Cells(ultima_linha, 1), .Cells(ultima_linha + nLinhasCopiadas, 1)).Value = arquivo.Name
+        End With
+        
+        'Fechar a pasta de trabalho atual sem salvar as alterações
+        pastaDeTrabalho.Close False
+        
+        'Definir o próximo intervalo de destino na planilha matriz
+        ultima_linha = Planilha3.UsedRange.Rows.Count + 1
+        Set intervaloDestino = ThisWorkbook.Sheets("psd_dados_brutos").Cells(ultima_linha, 2)
+proximo_arquivo:
+    Next arquivo
+    
+End Sub
+
+Sub atualizar_psd_dados_limpos()
+
+    'Atualizar tabela
+    Sheets("psd_dados_limpos").Select
+    Range("A1").Select
+    Selection.ListObject.QueryTable.Refresh BackgroundQuery:=False
+
+    'Atualizar tabela
+    Sheets("psd_dados_limpos_dataMaisRecent").Select
+    Range("A1").Select
+    Selection.ListObject.QueryTable.Refresh BackgroundQuery:=False
+    
+    Planilha1.Activate
+
+End Sub
+
